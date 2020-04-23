@@ -1,4 +1,4 @@
-let repeat = 20;
+let repeat = process.argv[2] || 20;
 const fs = require("fs");
 
 const buffer = fs.readFileSync("demo.wav");

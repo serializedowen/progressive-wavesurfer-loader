@@ -1168,6 +1168,7 @@ export default class WaveSurfer extends util.Observer {
    * @emits WaveSurfer#redraw
    */
   drawBuffer() {
+    console.log("drawbuffer");
     const nominalWidth = Math.round(
       this.getDuration() * this.params.minPxPerSec * this.params.pixelRatio
     );
@@ -1187,6 +1188,7 @@ export default class WaveSurfer extends util.Observer {
     }
 
     let peaks;
+
     if (this.params.partialRender) {
       const newRanges = this.peakCache.addRangeToPeakCache(width, start, end);
       let i;
