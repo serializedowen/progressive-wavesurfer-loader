@@ -40,7 +40,7 @@ wavesurfer.prototype.getWaveLength = function (duration) {
 
 wavesurfer.prototype.getPeaks = function (arraybuffer, callback) {
   return new Promise((resolve, reject) => {
-    this.backend.decodeArrayBuffer(
+    this.decodeArrayBuffer(
       arraybuffer,
       (buffer) => {
         if (!this.isDestroyed) {
@@ -156,7 +156,7 @@ export default function useWave() {
                 requestDispatcher.rangeList.length ===
                 requestDispatcher.decodedCount
               ) {
-                requestDispatcher = null;
+                // requestDispatcher = null;
               } else {
                 // ws.loadPeakRange(peaksList);
               }
@@ -168,14 +168,17 @@ export default function useWave() {
     });
 
     const handler = throttle((timeStamp) => {
-      requestDispatcher.fireEvent(
-        "request-block",
-        Math.floor(timeStamp / 10) + 1
+      const index = Math.floor(
+        (ws.backend.getPlayedPercents() * peaksList.length) /
+          requestDispatcher.options.peakSize
       );
+
+      requestDispatcher.fireEvent("request-block", index + 1);
     }, 1000);
 
     ws.on("audioprocess", handler);
 
+    ws.on("destroy", ws.unAll);
     window.rd = requestDispatcher;
   });
 

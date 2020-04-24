@@ -1,5 +1,5 @@
 import Observer from "./wavesurfer/util/observer";
-import Axios from "axios";
+import Axios, { CancelToken } from "axios";
 
 export const PENDING = Symbol("PENDING");
 export const IDLE = Symbol("IDLE");
@@ -43,6 +43,7 @@ type RangeData = {
   status: Symbol;
   data?: ArrayBuffer;
   peaks?: number[];
+  cancel?: CancelToken;
 };
 
 class RequestDispatcher extends Observer {
@@ -89,6 +90,7 @@ class RequestDispatcher extends Observer {
 
   readBytesRange(range: RangeData) {
     const { start, end } = range;
+
     return Axios.get(this.url, {
       responseType: this.options.responseType,
       headers: {
