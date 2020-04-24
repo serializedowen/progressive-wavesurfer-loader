@@ -1,9 +1,9 @@
 import Observer from "./wavesurfer/util/observer";
 import Axios from "axios";
 
-const PENDING = Symbol("PENDING");
-const IDLE = Symbol("IDLE");
-const FINISHED = Symbol("FINISHED");
+export const PENDING = Symbol("PENDING");
+export const IDLE = Symbol("IDLE");
+export const FINISHED = Symbol("FINISHED");
 
 function getWavHeaderInfo(buffer: ArrayBuffer) {
   const firstBuffer = buffer;
@@ -50,6 +50,7 @@ class RequestDispatcher extends Observer {
     responseType: "arraybuffer",
     rangeFirstSize: 100,
     rangeSize: 1024000 * 3,
+    peakSize: 11148, // calculate it
     loadRangeSuccess: null, // 每一段请求之后完成的回调
   };
 
@@ -112,11 +113,9 @@ class RequestDispatcher extends Observer {
       if (index >= this.rangeList.length) throw new Error("index out of bound");
 
       if (this.rangeList[index].status === IDLE) {
-        return this.readBytesRange(this.rangeList[index])
-          .then((response) => {
-            return this.rangeLoaded(response.data, this.rangeList[index], true);
-          })
-          .then(() => {});
+        return this.readBytesRange(this.rangeList[index]).then((response) => {
+          return this.rangeLoaded(response.data, this.rangeList[index], true);
+        });
       } else {
         return Promise.resolve(this.rangeList[index]);
       }
@@ -125,6 +124,7 @@ class RequestDispatcher extends Observer {
     return this.readBytesRange(this.rangeList[0]).then((response) => {
       const fileRange = response.headers["content-range"].match(/\d+/g);
       const fileSize = parseInt(fileRange[2], 10);
+
       this.buildRangeList(fileSize);
       this.headerBuffer = getWavHeaderInfo(response.data);
 

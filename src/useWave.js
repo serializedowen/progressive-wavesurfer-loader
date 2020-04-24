@@ -1,44 +1,46 @@
 import wavesurfer from "./wavesurfer/wavesurfer";
-import RequestDispatcher from "./RequestDispatcher";
 import flatten from "lodash/flatten";
 import throttle from "lodash/throttle";
 import Axios from "axios";
-import RequestDispatcher2 from "./RequestDispatcher2";
+import timeline from "./wavesurfer/plugin/timeline";
+import RequestDispatcher, { FINISHED } from "./RequestDispatcher";
 
 wavesurfer.prototype.loadPeaks = function (peaks) {
   this.backend.buffer = null;
-  this.backend.setPeaks(flatten(peaks));
+  this.backend.setPeaks(peaks);
   this.drawBuffer();
   this.fireEvent("waveform-ready");
   this.isReady = true;
 };
 
-wavesurfer.prototype.drawBufferRange = function (start = 0, end = 2000) {
-  const nominalWidth = Math.round(
-    this.getDuration() * this.params.minPxPerSec * this.params.pixelRatio
+wavesurfer.prototype.loadPeakRange = function (requestDispatcher) {
+  const placeHolder = new Array(requestDispatcher.options.peakSize);
+  placeHolder.fill(0);
+
+  const peaks = flatten(
+    requestDispatcher.rangeList.map((range) => {
+      if (range.status === FINISHED) {
+        console.log(range.peaks);
+        return range.peaks;
+      } else {
+        return placeHolder;
+      }
+    })
   );
-  const parentWidth = this.drawer.getWidth();
-  let width = nominalWidth;
-
-  let peaks;
-
-  console.log(start, end, width);
-
-  peaks = this.backend.getPeaks(width, start, end);
-  this.drawer.drawPeaks(peaks, width, 200, 400);
-
-  this.fireEvent("redraw", peaks, width);
+  this.backend.setPeaks(peaks);
+  this.drawBuffer();
 };
 
-wavesurfer.prototype.loadPeakRange = function (range) {
-  // console.log(range.peaks);
-  this.backend.setPeaks(range.peaks);
-  this.drawBufferRange(0, 2000);
+wavesurfer.prototype.getWaveLength = function (duration) {
+  const length = duration || this.getDuration();
+  return Math.round(
+    length * this.params.minPxPerSec * this.params.pixelRatio * 2
+  );
 };
 
 wavesurfer.prototype.getPeaks = function (arraybuffer, callback) {
   return new Promise((resolve, reject) => {
-    this.decodeArrayBuffer(
+    this.backend.decodeArrayBuffer(
       arraybuffer,
       (buffer) => {
         if (!this.isDestroyed) {
@@ -95,6 +97,12 @@ const ws = wavesurfer.create({
   backend: "MediaElement",
   responsive: true,
   fillParent: false,
+
+  plugins: [
+    timeline.create({
+      container: "#timeline",
+    }),
+  ],
 });
 
 window.ws = ws;
@@ -115,49 +123,61 @@ function modDecode(...args) {
 
 ws.decodeArrayBuffer = modDecode;
 
-ws.on("ready", () => console.error("ready"));
-
 export function toggle() {
   return ws.isPlaying() ? ws.pause() : ws.play();
 }
 
 export default function useWave() {
-  let peaksList = [];
-  // let requestWav = new RequestDispatcher();
+  ws.once("ready", () => {
+    let peaksList = new Array(ws.getWaveLength() + 2);
+    peaksList.fill(0);
 
-  let requestWav = new RequestDispatcher2();
+    let requestDispatcher = new RequestDispatcher();
 
-  // Axios.head("http://localhost:5000/test.wav").then((res) => {
-  //   console.log(res.headers["content-length"]);
-  // });
+    requestDispatcher.loadBlocks("http://localhost:5000/test.wav", {
+      loadRangeSuccess(range) {
+        return ws
+          .getPeaks(range.data)
+          .then((peaks) => {
+            requestDispatcher.decodedCount++;
+            range.peaks = peaks;
 
-  requestWav.loadBlocks("http://localhost:5000/test.wav", {
-    loadRangeSuccess(range) {
-      peaksList[range.index - 1] = [];
-      // 调用扩展的 waveSurfer 方法获取每一段音频的 peaks
-      return ws.getPeaks(range.data).then((peaks) => {
-        requestWav.decodedCount += 1;
-        peaksList[range.index - 1] = peaks;
+            if (range.index > 0) {
+              const start =
+                (range.index - 1) * requestDispatcher.options.peakSize;
 
-        range.peaks = peaks;
+              console.log(start, range.peaks.length);
+              peaksList.splice(start, range.peaks.length, ...range.peaks);
 
-        if (requestWav.rangeList.length === requestWav.decodedCount) {
-          ws.loadPeaks(peaksList);
-          // requestWav = null;
-        } else {
-          ws.loadPeakRange(range);
-        }
-      });
-    },
+              console.log(peaksList);
+              // peaksList[range.index - 1] = peaks;
+
+              if (
+                requestDispatcher.rangeList.length ===
+                requestDispatcher.decodedCount
+              ) {
+                requestDispatcher = null;
+              } else {
+                // ws.loadPeakRange(peaksList);
+              }
+              ws.loadPeaks(peaksList);
+            }
+          })
+          .catch(console.log);
+      },
+    });
+
+    const handler = throttle((timeStamp) => {
+      requestDispatcher.fireEvent(
+        "request-block",
+        Math.floor(timeStamp / 10) + 1
+      );
+    }, 1000);
+
+    ws.on("audioprocess", handler);
+
+    window.rd = requestDispatcher;
   });
-
-  const handler = throttle((timeStamp) => {
-    requestWav.fireEvent("request-block", Math.floor(timeStamp / 10));
-  }, 1000);
-
-  ws.on("audioprocess", handler);
-
-  window.wv = requestWav;
 
   ws.load("http://localhost:5000/test.wav", [], "none");
   // ws.load("http://localhost:5000/test.wav");
