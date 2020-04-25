@@ -87,8 +87,9 @@ function initWave() {
 
     const handler = throttle((timeStamp) => {
       const index = Math.floor(
-        (ws.backend.getPlayedPercents() * peaksList.length) /
-          requestDispatcher.options.peakSize
+        0.02 +
+          (ws.backend.getPlayedPercents() * peaksList.length) /
+            requestDispatcher.options.peakSize
       );
 
       requestDispatcher.fireEvent("request-block", index + 1);
