@@ -1,14 +1,16 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "./App.css";
-import useWave, { toggle } from "./useWave";
+import useWave from "./useWave";
+
 function App() {
-  useWave();
+  const { toggle, destroy, reload } = useWave();
 
   return (
     <div className="App">
       <div id="wavesurfer"></div>
 
-      <button onClick={useWave}>reload</button>
+      <button onClick={destroy}>destory</button>
+      <button onClick={reload}>reload</button>
       <button onClick={toggle}>play</button>
     </div>
   );
